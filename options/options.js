@@ -221,9 +221,17 @@
   }
 
   function showEditorErrors(errors) {
-    editorErrors.innerHTML = '<strong>Please fix:</strong><ul>' +
-      errors.map(e => `<li>${escapeHtml(e)}</li>`).join('') +
-      '</ul>';
+    editorErrors.textContent = '';
+    const strong = document.createElement('strong');
+    strong.textContent = 'Please fix:';
+    const ul = document.createElement('ul');
+    for (const e of errors) {
+      const li = document.createElement('li');
+      li.textContent = e;
+      ul.appendChild(li);
+    }
+    editorErrors.appendChild(strong);
+    editorErrors.appendChild(ul);
     editorErrors.classList.remove('hidden');
   }
 
@@ -345,47 +353,86 @@
       const result = await browser.runtime.sendMessage({ type: 'TEST_URL', url });
 
       if (!result.matches || result.matches.length === 0) {
-        testResults.innerHTML = '<div class="test-no-match">No rules match this URL.</div>';
+        testResults.textContent = '';
+        const noMatch = document.createElement('div');
+        noMatch.className = 'test-no-match';
+        noMatch.textContent = 'No rules match this URL.';
+        testResults.appendChild(noMatch);
         return;
       }
 
-      let html = '';
+      const frag = document.createDocumentFragment();
+
       for (const match of result.matches) {
-        html += `<div class="test-match">`;
-        html += `<span class="test-match-rule">${escapeHtml(match.ruleName)}</span>`;
-        html += `</div>`;
+        const div = document.createElement('div');
+        div.className = 'test-match';
+        const span = document.createElement('span');
+        span.className = 'test-match-rule';
+        span.textContent = match.ruleName;
+        div.appendChild(span);
+        frag.appendChild(div);
       }
 
       if (result.mergedActions) {
-        html += '<div class="test-actions"><strong>Actions:</strong> ';
+        const actDiv = document.createElement('div');
+        actDiv.className = 'test-actions';
+        const actLabel = document.createElement('strong');
+        actLabel.textContent = 'Actions:';
+        actDiv.appendChild(actLabel);
+        actDiv.append(' ');
         for (const [key, value] of Object.entries(result.mergedActions)) {
-          html += `<span class="test-action ${value}">${key}: ${value}</span>`;
+          const span = document.createElement('span');
+          span.className = `test-action ${value}`;
+          span.textContent = `${key}: ${value}`;
+          actDiv.appendChild(span);
         }
-        html += '</div>';
+        frag.appendChild(actDiv);
       }
 
       if (result.mergedTiming) {
-        html += '<div class="test-actions"><strong>Timing:</strong> ';
+        const timDiv = document.createElement('div');
+        timDiv.className = 'test-actions';
+        const timLabel = document.createElement('strong');
+        timLabel.textContent = 'Timing:';
+        timDiv.appendChild(timLabel);
+        timDiv.append(' ');
         const timings = [];
         if (result.mergedTiming.asap) timings.push('ASAP');
         if (result.mergedTiming.onTabClose) timings.push('On tab close');
         if (result.mergedTiming.onBrowserClose) timings.push('On browser close');
         if (result.mergedTiming.periodicMinutes) timings.push(`Every ${result.mergedTiming.periodicMinutes}min`);
-        html += timings.join(', ') || 'none';
-        html += '</div>';
+        timDiv.append(timings.join(', ') || 'none');
+        frag.appendChild(timDiv);
       }
 
       if (result.hostname) {
-        html += `<div class="test-origin">Origin: <code>${escapeHtml(result.hostname)}</code>`;
+        const originDiv = document.createElement('div');
+        originDiv.className = 'test-origin';
+        originDiv.append('Origin: ');
+        const code = document.createElement('code');
+        code.textContent = result.hostname;
+        originDiv.appendChild(code);
         if (result.hostnames && result.hostnames.length > 1) {
-          html += ` (also: ${result.hostnames.slice(1).map(h => `<code>${escapeHtml(h)}</code>`).join(', ')})`;
+          originDiv.append(' (also: ');
+          result.hostnames.slice(1).forEach((h, i) => {
+            if (i > 0) originDiv.append(', ');
+            const c = document.createElement('code');
+            c.textContent = h;
+            originDiv.appendChild(c);
+          });
+          originDiv.append(')');
         }
-        html += `</div>`;
+        frag.appendChild(originDiv);
       }
 
-      testResults.innerHTML = html;
+      testResults.textContent = '';
+      testResults.appendChild(frag);
     } catch (err) {
-      testResults.innerHTML = `<div class="test-no-match">Error: ${escapeHtml(err.message)}</div>`;
+      testResults.textContent = '';
+      const errDiv = document.createElement('div');
+      errDiv.className = 'test-no-match';
+      errDiv.textContent = `Error: ${err.message}`;
+      testResults.appendChild(errDiv);
     }
   }
 
