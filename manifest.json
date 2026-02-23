@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ShadowLog",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Regex-based automatic browsing history and site data cleanup — private browsing lite",
 
   "background": {
