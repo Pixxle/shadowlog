@@ -100,7 +100,9 @@ window.ShadowLog.Buffer = (() => {
     console.log(`ShadowLog: flushing ${ready.length} buffered entries`);
 
     for (const entry of ready) {
-      const result = await DeletionEngine.executeActions(entry.url, entry.actions);
+      const result = await DeletionEngine.executeActions(entry.url, entry.actions, {
+        historyLogContext: 'bufferRetry',
+      });
       if (result.success) {
         await markSuccess(entry.id);
       } else {

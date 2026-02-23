@@ -75,6 +75,64 @@ describe('ShadowLog.DeletionEngine', () => {
       expect(result.success).toBe(true);
     });
 
+    it('should delete equivalent redirect variants found in history search', async () => {
+      bm.history.search.mockResolvedValueOnce([
+        { url: 'https://www.example.com/' },
+        { url: 'http://example.com/' },
+        { url: 'https://www.example.com/somewhere-else' },
+      ]);
+
+      const result = await DeletionEngine.deleteHistory('http://example.com/');
+      const deletedUrls = bm.history.deleteUrl.mock.calls.map((call) => call[0].url);
+
+      expect(bm.history.search).toHaveBeenCalledWith({
+        text: 'example.com',
+        startTime: 0,
+        maxResults: 1000,
+      });
+      expect(deletedUrls).toEqual(expect.arrayContaining([
+        'http://example.com/',
+        'https://www.example.com/',
+      ]));
+      expect(deletedUrls).not.toContain('https://www.example.com/somewhere-else');
+      expect(result.success).toBe(true);
+    });
+
+    it('should treat trailing slash variants as equivalent', async () => {
+      bm.history.search.mockResolvedValueOnce([
+        { url: 'https://www.example.com/path/' },
+      ]);
+
+      await DeletionEngine.deleteHistory('http://example.com/path');
+
+      const deletedUrls = bm.history.deleteUrl.mock.calls.map((call) => call[0].url);
+      expect(deletedUrls).toEqual(expect.arrayContaining([
+        'http://example.com/path',
+        'https://www.example.com/path/',
+      ]));
+    });
+
+    it('should delete current page and descendant pages when includeSubpages is true', async () => {
+      bm.history.search.mockResolvedValueOnce([
+        { url: 'https://example.com/area' },
+        { url: 'https://example.com/area/sub' },
+        { url: 'https://www.example.com/area/sub/deeper?x=1' },
+        { url: 'https://example.com/area-else' },
+        { url: 'https://example.com/other' },
+      ]);
+
+      await DeletionEngine.deleteHistory('https://example.com/area', { includeSubpages: true });
+
+      const deletedUrls = bm.history.deleteUrl.mock.calls.map((call) => call[0].url);
+      expect(deletedUrls).toEqual(expect.arrayContaining([
+        'https://example.com/area',
+        'https://example.com/area/sub',
+        'https://www.example.com/area/sub/deeper?x=1',
+      ]));
+      expect(deletedUrls).not.toContain('https://example.com/area-else');
+      expect(deletedUrls).not.toContain('https://example.com/other');
+    });
+
     it('should return success false with error on failure', async () => {
       bm.history.deleteUrl.mockRejectedValueOnce(new Error('not found'));
       const result = await DeletionEngine.deleteHistory('https://example.com');
@@ -202,9 +260,29 @@ describe('ShadowLog.DeletionEngine', () => {
   });
 
   describe('executeActions', () => {
-    it('should return error for an unparseable URL', async () => {
+    it('should report history failure for an unparseable URL when deleting history', async () => {
+      bm.history.deleteUrl.mockRejectedValueOnce(new Error('Invalid URL'));
       const result = await DeletionEngine.executeActions('not a url', { history: 'delete' });
-      expect(result.error).toBe('Could not parse URL');
+      expect(result.success).toBe(false);
+      expect(result.history.success).toBe(false);
+    });
+
+    it('should still clear cache for an unparseable URL when cache is requested', async () => {
+      jest.setSystemTime(4_000_000);
+      const result = await DeletionEngine.executeActions('not a url', {
+        history: 'keep', cookies: 'keep', cache: 'delete', siteData: 'keep',
+      });
+      expect(bm.browsingData.remove).toHaveBeenCalledWith({}, { cache: true });
+      expect(result.cache.success).toBe(true);
+      expect(result.success).toBe(true);
+    });
+
+    it('should report siteData parse error only when siteData deletion is requested', async () => {
+      const result = await DeletionEngine.executeActions('not a url', {
+        history: 'keep', cookies: 'delete', cache: 'keep', siteData: 'keep',
+      });
+      expect(result.success).toBe(false);
+      expect(result.siteData).toEqual({ success: false, error: 'Could not parse URL' });
     });
 
     it('should delete history when action is delete', async () => {
@@ -272,12 +350,75 @@ describe('ShadowLog.DeletionEngine', () => {
       expect(result.history.success).toBe(false);
     });
 
+    it('should report overall failure when history deletion is only partially successful', async () => {
+      bm.history.search.mockResolvedValueOnce([
+        { url: 'https://www.example.com/page' },
+      ]);
+      bm.history.deleteUrl
+        .mockResolvedValueOnce()
+        .mockRejectedValueOnce(new Error('second delete failed'));
+
+      const result = await DeletionEngine.executeActions('https://example.com/page', {
+        history: 'delete', cookies: 'keep', cache: 'keep', siteData: 'keep',
+      });
+
+      expect(result.history.success).toBe(true);
+      expect(result.history.partial).toBe(true);
+      expect(result.success).toBe(false);
+    });
+
     it('should report overall failure when siteData deletion fails', async () => {
       bm.browsingData.remove.mockRejectedValueOnce(new Error('fail'));
       const result = await DeletionEngine.executeActions('https://example.com', {
         history: 'keep', cookies: 'delete', cache: 'keep', siteData: 'keep',
       });
       expect(result.success).toBe(false);
+    });
+  });
+
+  describe('areEquivalentHistoryUrls', () => {
+    it('should match http/https and www/non-www variants of the same page', () => {
+      expect(
+        DeletionEngine.areEquivalentHistoryUrls(
+          'http://example.com/path?x=1',
+          'https://www.example.com/path/?x=1'
+        )
+      ).toBe(true);
+    });
+
+    it('should not match different paths', () => {
+      expect(
+        DeletionEngine.areEquivalentHistoryUrls(
+          'http://example.com/path',
+          'https://www.example.com/other'
+        )
+      ).toBe(false);
+    });
+  });
+
+  describe('isHistoryUrlInSubtree', () => {
+    it('should match the same page and descendants across http/https and www', () => {
+      expect(
+        DeletionEngine.isHistoryUrlInSubtree(
+          'http://example.com/path',
+          'https://www.example.com/path/child?x=1'
+        )
+      ).toBe(true);
+      expect(
+        DeletionEngine.isHistoryUrlInSubtree(
+          'http://example.com/path',
+          'https://www.example.com/path'
+        )
+      ).toBe(true);
+    });
+
+    it('should not match sibling paths with the same prefix', () => {
+      expect(
+        DeletionEngine.isHistoryUrlInSubtree(
+          'https://example.com/path',
+          'https://example.com/pathology'
+        )
+      ).toBe(false);
     });
   });
 });

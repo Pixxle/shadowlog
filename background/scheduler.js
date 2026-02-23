@@ -75,12 +75,14 @@ window.ShadowLog.Scheduler = (() => {
 
       let deleteCount = 0;
       for (const item of historyItems) {
-        const matches = RulesEngine.evaluateUrl(item.url);
-        if (matches.length > 0) {
-          const mergedActions = RulesEngine.mergeActions(matches);
-          const result = await DeletionEngine.executeActions(item.url, mergedActions);
-          if (result.success) deleteCount++;
-        }
+        const matches = RulesEngine.evaluateUrl(item.url).filter((m) => m.ruleId === ruleId);
+        if (matches.length === 0) continue;
+
+        const mergedActions = RulesEngine.mergeActions(matches);
+        const result = await DeletionEngine.executeActions(item.url, mergedActions, {
+          historyLogContext: 'periodic',
+        });
+        if (result.success) deleteCount++;
       }
 
       if (deleteCount > 0) {

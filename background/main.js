@@ -52,6 +52,14 @@ window.ShadowLog = window.ShadowLog || {};
     }
   }
 
+  function fireAndForget(context, work) {
+    Promise.resolve()
+      .then(() => work())
+      .catch((err) => {
+        console.error(`ShadowLog: async task failed (${context})`, err);
+      });
+  }
+
   // --- Action log ---
   async function logAction(entry) {
     await Storage.updateLocal(Constants.STORAGE_KEY_ACTION_LOG, (log) => {
@@ -107,7 +115,9 @@ window.ShadowLog = window.ShadowLog || {};
 
     markProcessed(url);
 
-    const result = await DeletionEngine.executeActions(url, mergedActions);
+    const result = await DeletionEngine.executeActions(url, mergedActions, {
+      historyLogContext: trigger,
+    });
 
     await logAction({ url, ruleNames, actions: mergedActions, result });
 
@@ -131,7 +141,7 @@ window.ShadowLog = window.ShadowLog || {};
     // Skip internal pages
     if (historyItem.url.startsWith('about:') || historyItem.url.startsWith('moz-extension:')) return;
 
-    processDeletion(historyItem.url, 'asap');
+    fireAndForget('processDeletion:asap(history)', () => processDeletion(historyItem.url, 'asap'));
   }
 
   function handleNavigation(details) {
@@ -140,10 +150,10 @@ window.ShadowLog = window.ShadowLog || {};
     if (details.url.startsWith('about:') || details.url.startsWith('moz-extension:')) return;
 
     // Update tab tracker
-    TabTracker.trackNavigation(details.tabId, details.url);
+    fireAndForget('trackNavigation', () => TabTracker.trackNavigation(details.tabId, details.url));
 
     // Secondary ASAP trigger (in case history.onVisited is delayed)
-    processDeletion(details.url, 'asap');
+    fireAndForget('processDeletion:asap(navigation)', () => processDeletion(details.url, 'asap'));
   }
 
   async function handleTabRemoved(tabId, removeInfo) {
@@ -178,9 +188,10 @@ window.ShadowLog = window.ShadowLog || {};
   function handleStorageChanged(changes, area) {
     if (area === 'local' && changes[Constants.STORAGE_KEY_RULES]) {
       console.log('ShadowLog: rules changed, reloading');
-      RulesEngine.loadRules().then(() => {
+      fireAndForget('reloadRulesOnStorageChange', async () => {
+        await RulesEngine.loadRules();
         const allRules = changes[Constants.STORAGE_KEY_RULES].newValue || [];
-        Scheduler.syncAlarms(allRules);
+        await Scheduler.syncAlarms(allRules);
       });
     }
   }
@@ -208,7 +219,10 @@ window.ShadowLog = window.ShadowLog || {};
       case 'FORGET_URL': {
         if (!message.url) return { ok: false, error: 'No URL provided' };
         const forgetActions = { history: 'delete', cookies: 'delete', cache: 'keep', siteData: 'delete' };
-        const result = await DeletionEngine.executeActions(message.url, forgetActions);
+        const result = await DeletionEngine.executeActions(message.url, forgetActions, {
+          historyIncludeSubpages: true,
+          historyLogContext: 'manualForget',
+        });
         await logAction({
           url: message.url,
           ruleNames: ['Manual forget'],
@@ -282,7 +296,7 @@ window.ShadowLog = window.ShadowLog || {};
   browser.windows.onRemoved.addListener(handleWindowRemoved);
 
   browser.alarms.onAlarm.addListener((alarm) => {
-    Scheduler.handleAlarm(alarm);
+    fireAndForget(`alarm:${alarm.name}`, () => Scheduler.handleAlarm(alarm));
   });
 
   browser.storage.onChanged.addListener(handleStorageChanged);
@@ -294,7 +308,7 @@ window.ShadowLog = window.ShadowLog || {};
 
   browser.runtime.onStartup.addListener(() => {
     console.log('ShadowLog: onStartup');
-    bootstrap();
+    fireAndForget('bootstrap:onStartup', bootstrap);
   });
 
   browser.runtime.onInstalled.addListener((details) => {
@@ -304,11 +318,11 @@ window.ShadowLog = window.ShadowLog || {};
       Storage.setLocal(Constants.STORAGE_KEY_RULES, []);
       Storage.setLocal(Constants.STORAGE_KEY_ACTION_LOG, []);
     }
-    bootstrap();
+    fireAndForget(`bootstrap:onInstalled:${details.reason}`, bootstrap);
   });
 
   // Also bootstrap immediately when the background script loads
   // (handles temporary extension loading via about:debugging)
-  bootstrap();
+  fireAndForget('bootstrap:load', bootstrap);
 
 })();
