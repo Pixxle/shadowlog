@@ -7,6 +7,14 @@ window.ShadowLog.DeletionEngine = (() => {
 
   let lastCacheClearTime = 0;
 
+  function parseUrl(url) {
+    try {
+      return new URL(url);
+    } catch {
+      return null;
+    }
+  }
+
   function expandHostnames(hostname) {
     const hostnames = [hostname];
     if (hostname.startsWith('www.')) {
@@ -18,11 +26,8 @@ window.ShadowLog.DeletionEngine = (() => {
   }
 
   function extractHostname(url) {
-    try {
-      return new URL(url).hostname;
-    } catch {
-      return null;
-    }
+    const parsed = parseUrl(url);
+    return parsed ? parsed.hostname : null;
   }
 
   function normalizePathname(pathname) {
@@ -57,56 +62,75 @@ window.ShadowLog.DeletionEngine = (() => {
     return candidate.startsWith(base + '/');
   }
 
-  function areEquivalentHistoryUrls(sourceUrl, candidateUrl) {
-    try {
-      const source = new URL(sourceUrl);
-      const candidate = new URL(candidateUrl);
-
-      if (!hasCompatibleHistoryOrigin(source, candidate)) {
-        return false;
-      }
-
-      if (normalizePathname(candidate.pathname) !== normalizePathname(source.pathname)) {
-        return false;
-      }
-
-      return (candidate.search || '') === (source.search || '');
-    } catch {
+  function areEquivalentHistoryUrlObjects(source, candidate) {
+    if (!hasCompatibleHistoryOrigin(source, candidate)) {
       return false;
     }
+
+    if (normalizePathname(candidate.pathname) !== normalizePathname(source.pathname)) {
+      return false;
+    }
+
+    return (candidate.search || '') === (source.search || '');
+  }
+
+  function areEquivalentHistoryUrls(sourceUrl, candidateUrl) {
+    const source = parseUrl(sourceUrl);
+    const candidate = parseUrl(candidateUrl);
+    if (!source || !candidate) {
+      return false;
+    }
+
+    return areEquivalentHistoryUrlObjects(source, candidate);
+  }
+
+  function isHistoryUrlInSubtreeObjects(source, candidate) {
+    if (!hasCompatibleHistoryOrigin(source, candidate)) {
+      return false;
+    }
+
+    return isSameOrDescendantPath(source.pathname, candidate.pathname);
   }
 
   function isHistoryUrlInSubtree(sourceUrl, candidateUrl) {
-    try {
-      const source = new URL(sourceUrl);
-      const candidate = new URL(candidateUrl);
-
-      if (!hasCompatibleHistoryOrigin(source, candidate)) {
-        return false;
-      }
-
-      return isSameOrDescendantPath(source.pathname, candidate.pathname);
-    } catch {
+    const source = parseUrl(sourceUrl);
+    const candidate = parseUrl(candidateUrl);
+    if (!source || !candidate) {
       return false;
     }
+
+    return isHistoryUrlInSubtreeObjects(source, candidate);
   }
 
-  async function findMatchingHistoryUrls(url, matcher) {
-    const hostname = extractHostname(url);
-    if (!hostname || !browser?.history?.search) {
+  function createHistoryUrlMatcher(source, includeSubpages) {
+    if (includeSubpages) {
+      return (candidate) => isHistoryUrlInSubtreeObjects(source, candidate);
+    }
+    return (candidate) => areEquivalentHistoryUrlObjects(source, candidate);
+  }
+
+  async function findMatchingHistoryUrls(url, options = {}) {
+    const source = parseUrl(url);
+    if (!source || !browser?.history?.search) {
       return [];
     }
 
+    const matcher = createHistoryUrlMatcher(source, !!options.includeSubpages);
+
     try {
       const items = await browser.history.search({
-        text: hostname,
+        text: source.hostname,
         startTime: 0,
         maxResults: 1000,
       });
 
       return (items || [])
         .map((item) => item && item.url)
-        .filter((candidateUrl) => candidateUrl && matcher(url, candidateUrl));
+        .filter((candidateUrl) => {
+          if (!candidateUrl) return false;
+          const candidate = parseUrl(candidateUrl);
+          return candidate ? matcher(candidate) : false;
+        });
     } catch (err) {
       console.warn('ShadowLog: history.search failed, falling back to exact delete', err);
       return [];
@@ -117,10 +141,7 @@ window.ShadowLog.DeletionEngine = (() => {
     const includeSubpages = !!options.includeSubpages;
     const logContext = options.logContext || 'history';
     const urlsToDelete = new Set([url]);
-    const matchedUrls = await findMatchingHistoryUrls(
-      url,
-      includeSubpages ? isHistoryUrlInSubtree : areEquivalentHistoryUrls
-    );
+    const matchedUrls = await findMatchingHistoryUrls(url, { includeSubpages });
     for (const matchUrl of matchedUrls) {
       urlsToDelete.add(matchUrl);
     }
