@@ -75,6 +75,43 @@ describe('ShadowLog.DeletionEngine', () => {
       expect(result.success).toBe(true);
     });
 
+    it('should delete equivalent redirect variants found in history search', async () => {
+      bm.history.search.mockResolvedValueOnce([
+        { url: 'https://www.example.com/' },
+        { url: 'http://example.com/' },
+        { url: 'https://www.example.com/somewhere-else' },
+      ]);
+
+      const result = await DeletionEngine.deleteHistory('http://example.com/');
+      const deletedUrls = bm.history.deleteUrl.mock.calls.map((call) => call[0].url);
+
+      expect(bm.history.search).toHaveBeenCalledWith({
+        text: 'example.com',
+        startTime: 0,
+        maxResults: 1000,
+      });
+      expect(deletedUrls).toEqual(expect.arrayContaining([
+        'http://example.com/',
+        'https://www.example.com/',
+      ]));
+      expect(deletedUrls).not.toContain('https://www.example.com/somewhere-else');
+      expect(result.success).toBe(true);
+    });
+
+    it('should treat trailing slash variants as equivalent', async () => {
+      bm.history.search.mockResolvedValueOnce([
+        { url: 'https://www.example.com/path/' },
+      ]);
+
+      await DeletionEngine.deleteHistory('http://example.com/path');
+
+      const deletedUrls = bm.history.deleteUrl.mock.calls.map((call) => call[0].url);
+      expect(deletedUrls).toEqual(expect.arrayContaining([
+        'http://example.com/path',
+        'https://www.example.com/path/',
+      ]));
+    });
+
     it('should return success false with error on failure', async () => {
       bm.history.deleteUrl.mockRejectedValueOnce(new Error('not found'));
       const result = await DeletionEngine.deleteHistory('https://example.com');
@@ -278,6 +315,26 @@ describe('ShadowLog.DeletionEngine', () => {
         history: 'keep', cookies: 'delete', cache: 'keep', siteData: 'keep',
       });
       expect(result.success).toBe(false);
+    });
+  });
+
+  describe('areEquivalentHistoryUrls', () => {
+    it('should match http/https and www/non-www variants of the same page', () => {
+      expect(
+        DeletionEngine.areEquivalentHistoryUrls(
+          'http://example.com/path?x=1',
+          'https://www.example.com/path/?x=1'
+        )
+      ).toBe(true);
+    });
+
+    it('should not match different paths', () => {
+      expect(
+        DeletionEngine.areEquivalentHistoryUrls(
+          'http://example.com/path',
+          'https://www.example.com/other'
+        )
+      ).toBe(false);
     });
   });
 });
