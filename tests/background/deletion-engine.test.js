@@ -350,6 +350,23 @@ describe('ShadowLog.DeletionEngine', () => {
       expect(result.history.success).toBe(false);
     });
 
+    it('should report overall failure when history deletion is only partially successful', async () => {
+      bm.history.search.mockResolvedValueOnce([
+        { url: 'https://www.example.com/page' },
+      ]);
+      bm.history.deleteUrl
+        .mockResolvedValueOnce()
+        .mockRejectedValueOnce(new Error('second delete failed'));
+
+      const result = await DeletionEngine.executeActions('https://example.com/page', {
+        history: 'delete', cookies: 'keep', cache: 'keep', siteData: 'keep',
+      });
+
+      expect(result.history.success).toBe(true);
+      expect(result.history.partial).toBe(true);
+      expect(result.success).toBe(false);
+    });
+
     it('should report overall failure when siteData deletion fails', async () => {
       bm.browsingData.remove.mockRejectedValueOnce(new Error('fail'));
       const result = await DeletionEngine.executeActions('https://example.com', {

@@ -193,6 +193,11 @@ window.ShadowLog.DeletionEngine = (() => {
     }
   }
 
+  function isOperationSuccessful(result) {
+    if (!result) return true;
+    return result.success === true && result.partial !== true;
+  }
+
   async function executeActions(url, mergedActions, options = {}) {
     const results = {
       url,
@@ -225,9 +230,9 @@ window.ShadowLog.DeletionEngine = (() => {
       results.cache = await clearGlobalCache();
     }
 
-    results.success = (!results.history || results.history.success) &&
-      (!results.siteData || results.siteData.success) &&
-      (!results.cache || results.cache.success);
+    results.success = isOperationSuccessful(results.history) &&
+      isOperationSuccessful(results.siteData) &&
+      isOperationSuccessful(results.cache);
 
     return results;
   }
