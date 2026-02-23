@@ -260,9 +260,29 @@ describe('ShadowLog.DeletionEngine', () => {
   });
 
   describe('executeActions', () => {
-    it('should return error for an unparseable URL', async () => {
+    it('should report history failure for an unparseable URL when deleting history', async () => {
+      bm.history.deleteUrl.mockRejectedValueOnce(new Error('Invalid URL'));
       const result = await DeletionEngine.executeActions('not a url', { history: 'delete' });
-      expect(result.error).toBe('Could not parse URL');
+      expect(result.success).toBe(false);
+      expect(result.history.success).toBe(false);
+    });
+
+    it('should still clear cache for an unparseable URL when cache is requested', async () => {
+      jest.setSystemTime(4_000_000);
+      const result = await DeletionEngine.executeActions('not a url', {
+        history: 'keep', cookies: 'keep', cache: 'delete', siteData: 'keep',
+      });
+      expect(bm.browsingData.remove).toHaveBeenCalledWith({}, { cache: true });
+      expect(result.cache.success).toBe(true);
+      expect(result.success).toBe(true);
+    });
+
+    it('should report siteData parse error only when siteData deletion is requested', async () => {
+      const result = await DeletionEngine.executeActions('not a url', {
+        history: 'keep', cookies: 'delete', cache: 'keep', siteData: 'keep',
+      });
+      expect(result.success).toBe(false);
+      expect(result.siteData).toEqual({ success: false, error: 'Could not parse URL' });
     });
 
     it('should delete history when action is delete', async () => {

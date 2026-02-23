@@ -202,11 +202,6 @@ window.ShadowLog.DeletionEngine = (() => {
       cache: null,
     };
 
-    const hostname = extractHostname(url);
-    if (!hostname) {
-      return { ...results, error: 'Could not parse URL' };
-    }
-
     // Delete history
     if (mergedActions.history === 'delete') {
       results.history = await deleteHistory(url, {
@@ -217,7 +212,12 @@ window.ShadowLog.DeletionEngine = (() => {
 
     // Delete site data (cookies, localStorage, indexedDB, serviceWorkers)
     if (mergedActions.cookies === 'delete' || mergedActions.siteData === 'delete') {
-      results.siteData = await deleteSiteData(hostname, mergedActions);
+      const hostname = extractHostname(url);
+      if (!hostname) {
+        results.siteData = { success: false, error: 'Could not parse URL' };
+      } else {
+        results.siteData = await deleteSiteData(hostname, mergedActions);
+      }
     }
 
     // Clear cache (global only — Firefox limitation)
