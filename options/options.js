@@ -201,18 +201,23 @@
     if (editingRuleId) {
       rule = rules.find(r => r.id === editingRuleId);
       if (!rule) return;
+      const candidate = Object.assign({}, rule, values, { updatedAt: Date.now() });
+      const validation = RuleSchema.validateRule(candidate);
+      if (!validation.valid) {
+        showEditorErrors(validation.errors);
+        return;
+      }
       Object.assign(rule, values);
       rule.updatedAt = Date.now();
     } else {
       rule = RuleSchema.createRule(values);
+      const validation = RuleSchema.validateRule(rule);
+      if (!validation.valid) {
+        showEditorErrors(validation.errors);
+        return;
+      }
       rules.push(rule);
       editingRuleId = rule.id;
-    }
-
-    const validation = RuleSchema.validateRule(rule);
-    if (!validation.valid) {
-      showEditorErrors(validation.errors);
-      return;
     }
 
     await saveRules();
