@@ -265,6 +265,38 @@ describe('ShadowLog.Scheduler', () => {
         expect(bm.browsingData.remove).toHaveBeenCalled();
       });
 
+      it('should only apply the actions of the rule tied to the alarm', async () => {
+        const periodicRuleId = 'periodic-only-history';
+        const periodicRule = makeRule({
+          id: periodicRuleId,
+          name: 'Periodic History Only',
+          urlRegex: ['target\\.com'],
+          actions: { history: 'delete', cookies: 'keep', cache: 'keep', siteData: 'keep' },
+          timing: { asap: false, onTabClose: false, onBrowserClose: false, periodicMinutes: 10 },
+        });
+        const otherRule = makeRule({
+          id: 'other-rule',
+          name: 'Other Rule',
+          urlRegex: ['target\\.com'],
+          actions: { history: 'keep', cookies: 'delete', cache: 'keep', siteData: 'keep' },
+          timing: { asap: true, onTabClose: false, onBrowserClose: false, periodicMinutes: null },
+        });
+        bm._localStore[STORAGE_KEY_RULES] = [periodicRule, otherRule];
+
+        bm.history.search.mockResolvedValueOnce([
+          { url: 'https://target.com/page' },
+        ]);
+
+        const alarmName = Constants.ALARM_PERIODIC_PREFIX + periodicRuleId;
+        await Scheduler.handleAlarm({ name: alarmName });
+
+        expect(bm.history.deleteUrl).toHaveBeenCalledWith({ url: 'https://target.com/page' });
+        expect(bm.browsingData.remove).not.toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ cookies: true })
+        );
+      });
+
       it('should not delete non-matching history entries during sweep', async () => {
         const ruleId = 'r1';
         const rule = makeRule({ id: ruleId, urlRegex: ['specific\\.com'] });
