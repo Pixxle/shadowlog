@@ -112,6 +112,27 @@ describe('ShadowLog.DeletionEngine', () => {
       ]));
     });
 
+    it('should delete current page and descendant pages when includeSubpages is true', async () => {
+      bm.history.search.mockResolvedValueOnce([
+        { url: 'https://example.com/area' },
+        { url: 'https://example.com/area/sub' },
+        { url: 'https://www.example.com/area/sub/deeper?x=1' },
+        { url: 'https://example.com/area-else' },
+        { url: 'https://example.com/other' },
+      ]);
+
+      await DeletionEngine.deleteHistory('https://example.com/area', { includeSubpages: true });
+
+      const deletedUrls = bm.history.deleteUrl.mock.calls.map((call) => call[0].url);
+      expect(deletedUrls).toEqual(expect.arrayContaining([
+        'https://example.com/area',
+        'https://example.com/area/sub',
+        'https://www.example.com/area/sub/deeper?x=1',
+      ]));
+      expect(deletedUrls).not.toContain('https://example.com/area-else');
+      expect(deletedUrls).not.toContain('https://example.com/other');
+    });
+
     it('should return success false with error on failure', async () => {
       bm.history.deleteUrl.mockRejectedValueOnce(new Error('not found'));
       const result = await DeletionEngine.deleteHistory('https://example.com');
@@ -333,6 +354,32 @@ describe('ShadowLog.DeletionEngine', () => {
         DeletionEngine.areEquivalentHistoryUrls(
           'http://example.com/path',
           'https://www.example.com/other'
+        )
+      ).toBe(false);
+    });
+  });
+
+  describe('isHistoryUrlInSubtree', () => {
+    it('should match the same page and descendants across http/https and www', () => {
+      expect(
+        DeletionEngine.isHistoryUrlInSubtree(
+          'http://example.com/path',
+          'https://www.example.com/path/child?x=1'
+        )
+      ).toBe(true);
+      expect(
+        DeletionEngine.isHistoryUrlInSubtree(
+          'http://example.com/path',
+          'https://www.example.com/path'
+        )
+      ).toBe(true);
+    });
+
+    it('should not match sibling paths with the same prefix', () => {
+      expect(
+        DeletionEngine.isHistoryUrlInSubtree(
+          'https://example.com/path',
+          'https://example.com/pathology'
         )
       ).toBe(false);
     });

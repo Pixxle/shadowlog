@@ -112,6 +112,27 @@ describe('main.js (background entry point)', () => {
       expect(bm.history.deleteUrl).toHaveBeenCalledWith({ url: 'https://example.com/page' });
     });
 
+    it('should delete sub-pages of the current page from history', async () => {
+      bm.history.search.mockResolvedValueOnce([
+        { url: 'https://example.com/page' },
+        { url: 'https://example.com/page/sub' },
+        { url: 'https://example.com/page/sub/deeper' },
+        { url: 'https://example.com/page-other' },
+      ]);
+
+      const handler = bm.runtime.onMessage._listeners[0];
+      const result = await handler({ type: 'FORGET_URL', url: 'https://example.com/page' }, {});
+      const deletedUrls = bm.history.deleteUrl.mock.calls.map((call) => call[0].url);
+
+      expect(result.ok).toBe(true);
+      expect(deletedUrls).toEqual(expect.arrayContaining([
+        'https://example.com/page',
+        'https://example.com/page/sub',
+        'https://example.com/page/sub/deeper',
+      ]));
+      expect(deletedUrls).not.toContain('https://example.com/page-other');
+    });
+
     it('should return error when no URL provided', async () => {
       const handler = bm.runtime.onMessage._listeners[0];
       const result = await handler({ type: 'FORGET_URL' }, {});

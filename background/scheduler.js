@@ -78,7 +78,9 @@ window.ShadowLog.Scheduler = (() => {
         const matches = RulesEngine.evaluateUrl(item.url);
         if (matches.length > 0) {
           const mergedActions = RulesEngine.mergeActions(matches);
-          const result = await DeletionEngine.executeActions(item.url, mergedActions);
+          const result = await DeletionEngine.executeActions(item.url, mergedActions, {
+            historyLogContext: 'periodic',
+          });
           if (result.success) deleteCount++;
         }
       }

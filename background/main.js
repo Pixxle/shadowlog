@@ -107,7 +107,9 @@ window.ShadowLog = window.ShadowLog || {};
 
     markProcessed(url);
 
-    const result = await DeletionEngine.executeActions(url, mergedActions);
+    const result = await DeletionEngine.executeActions(url, mergedActions, {
+      historyLogContext: trigger,
+    });
 
     await logAction({ url, ruleNames, actions: mergedActions, result });
 
@@ -208,7 +210,10 @@ window.ShadowLog = window.ShadowLog || {};
       case 'FORGET_URL': {
         if (!message.url) return { ok: false, error: 'No URL provided' };
         const forgetActions = { history: 'delete', cookies: 'delete', cache: 'keep', siteData: 'delete' };
-        const result = await DeletionEngine.executeActions(message.url, forgetActions);
+        const result = await DeletionEngine.executeActions(message.url, forgetActions, {
+          historyIncludeSubpages: true,
+          historyLogContext: 'manualForget',
+        });
         await logAction({
           url: message.url,
           ruleNames: ['Manual forget'],

@@ -34,19 +34,35 @@ window.ShadowLog.DeletionEngine = (() => {
     return protocol === 'http:' || protocol === 'https:';
   }
 
+  function hasCompatibleHistoryOrigin(source, candidate) {
+    const allowedHostnames = new Set(expandHostnames(source.hostname));
+    if (!allowedHostnames.has(candidate.hostname)) {
+      return false;
+    }
+
+    if (isHttpLikeProtocol(source.protocol)) {
+      return isHttpLikeProtocol(candidate.protocol);
+    }
+
+    return candidate.protocol === source.protocol;
+  }
+
+  function isSameOrDescendantPath(basePathname, candidatePathname) {
+    const base = normalizePathname(basePathname);
+    const candidate = normalizePathname(candidatePathname);
+
+    if (base === '/') return true;
+    if (candidate === base) return true;
+
+    return candidate.startsWith(base + '/');
+  }
+
   function areEquivalentHistoryUrls(sourceUrl, candidateUrl) {
     try {
       const source = new URL(sourceUrl);
       const candidate = new URL(candidateUrl);
 
-      const allowedHostnames = new Set(expandHostnames(source.hostname));
-      if (!allowedHostnames.has(candidate.hostname)) {
-        return false;
-      }
-
-      if (isHttpLikeProtocol(source.protocol)) {
-        if (!isHttpLikeProtocol(candidate.protocol)) return false;
-      } else if (candidate.protocol !== source.protocol) {
+      if (!hasCompatibleHistoryOrigin(source, candidate)) {
         return false;
       }
 
@@ -60,7 +76,22 @@ window.ShadowLog.DeletionEngine = (() => {
     }
   }
 
-  async function findEquivalentHistoryUrls(url) {
+  function isHistoryUrlInSubtree(sourceUrl, candidateUrl) {
+    try {
+      const source = new URL(sourceUrl);
+      const candidate = new URL(candidateUrl);
+
+      if (!hasCompatibleHistoryOrigin(source, candidate)) {
+        return false;
+      }
+
+      return isSameOrDescendantPath(source.pathname, candidate.pathname);
+    } catch {
+      return false;
+    }
+  }
+
+  async function findMatchingHistoryUrls(url, matcher) {
     const hostname = extractHostname(url);
     if (!hostname || !browser?.history?.search) {
       return [];
@@ -75,17 +106,22 @@ window.ShadowLog.DeletionEngine = (() => {
 
       return (items || [])
         .map((item) => item && item.url)
-        .filter((candidateUrl) => candidateUrl && areEquivalentHistoryUrls(url, candidateUrl));
+        .filter((candidateUrl) => candidateUrl && matcher(url, candidateUrl));
     } catch (err) {
       console.warn('ShadowLog: history.search failed, falling back to exact delete', err);
       return [];
     }
   }
 
-  async function deleteHistory(url) {
+  async function deleteHistory(url, options = {}) {
+    const includeSubpages = !!options.includeSubpages;
+    const logContext = options.logContext || 'history';
     const urlsToDelete = new Set([url]);
-    const equivalentUrls = await findEquivalentHistoryUrls(url);
-    for (const matchUrl of equivalentUrls) {
+    const matchedUrls = await findMatchingHistoryUrls(
+      url,
+      includeSubpages ? isHistoryUrlInSubtree : areEquivalentHistoryUrls
+    );
+    for (const matchUrl of matchedUrls) {
       urlsToDelete.add(matchUrl);
     }
 
@@ -96,20 +132,21 @@ window.ShadowLog.DeletionEngine = (() => {
       try {
         await browser.history.deleteUrl({ url: candidateUrl });
         deletedUrls.push(candidateUrl);
+        console.log(`ShadowLog [${logContext}]: deleted history entry ${candidateUrl}`);
       } catch (err) {
         errors.push({ url: candidateUrl, error: err.message });
       }
     }
 
     if (deletedUrls.length === 0 && errors.length > 0) {
-      return { success: false, error: errors[0].error, errors };
+      return { success: false, error: errors[0].error, errors, includeSubpages };
     }
 
     if (errors.length > 0) {
-      return { success: true, partial: true, deletedUrls, errors };
+      return { success: true, partial: true, deletedUrls, errors, includeSubpages };
     }
 
-    return { success: true, deletedUrls };
+    return { success: true, deletedUrls, includeSubpages };
   }
 
   async function deleteSiteData(hostname, dataTypes) {
@@ -156,7 +193,7 @@ window.ShadowLog.DeletionEngine = (() => {
     }
   }
 
-  async function executeActions(url, mergedActions) {
+  async function executeActions(url, mergedActions, options = {}) {
     const results = {
       url,
       timestamp: Date.now(),
@@ -172,7 +209,10 @@ window.ShadowLog.DeletionEngine = (() => {
 
     // Delete history
     if (mergedActions.history === 'delete') {
-      results.history = await deleteHistory(url);
+      results.history = await deleteHistory(url, {
+        includeSubpages: !!options.historyIncludeSubpages,
+        logContext: options.historyLogContext,
+      });
     }
 
     // Delete site data (cookies, localStorage, indexedDB, serviceWorkers)
@@ -200,5 +240,6 @@ window.ShadowLog.DeletionEngine = (() => {
     extractHostname,
     expandHostnames,
     areEquivalentHistoryUrls,
+    isHistoryUrlInSubtree,
   };
 })();
