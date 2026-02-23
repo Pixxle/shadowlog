@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ShadowLog Options</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="container">
+    <header class="page-header">
+      <img src="../icons/icon-48.png" alt="" class="logo">
+      <div>
+        <h1>ShadowLog</h1>
+        <p class="subtitle">Configure URL matching rules and deletion behavior</p>
+      </div>
+    </header>
+
+    <div class="layout">
+      <!-- Left panel: rule list -->
+      <aside class="panel rule-list-panel">
+        <div class="panel-header">
+          <h2>Rules</h2>
+          <button id="btn-add-rule" class="btn btn-small btn-accent">+ New Rule</button>
+        </div>
+        <div id="rule-list" class="rule-list">
+          <p class="empty-state">No rules yet. Click "+ New Rule" to get started.</p>
+        </div>
+        <div class="panel-footer">
+          <button id="btn-import" class="btn btn-small btn-outline">Import</button>
+          <button id="btn-export" class="btn btn-small btn-outline">Export</button>
+          <input type="file" id="import-file" accept=".json" class="hidden">
+        </div>
+      </aside>
+
+      <!-- Right panel: rule editor + tools -->
+      <main class="panel editor-panel">
+        <!-- Rule editor (hidden when no rule selected) -->
+        <div id="editor" class="hidden">
+          <div class="panel-header">
+            <h2 id="editor-title">New Rule</h2>
+            <div class="editor-actions">
+              <button id="btn-save" class="btn btn-small btn-accent">Save</button>
+              <button id="btn-cancel" class="btn btn-small btn-outline">Cancel</button>
+            </div>
+          </div>
+
+          <div id="editor-errors" class="error-box hidden"></div>
+
+          <div class="form-group">
+            <label for="field-name">Rule Name</label>
+            <input type="text" id="field-name" placeholder="e.g. Block social media tracking">
+          </div>
+
+          <div class="form-group">
+            <label for="field-url-regex">URL Regex Patterns <span class="hint">(one per line, case-insensitive)</span></label>
+            <textarea id="field-url-regex" rows="4" placeholder="e.g. facebook\.com/tr&#10;doubleclick\.net"></textarea>
+            <div id="regex-validation" class="validation-feedback"></div>
+          </div>
+
+          <div class="form-group">
+            <label for="field-exclude-regex">Exclude Patterns <span class="hint">(optional, one per line)</span></label>
+            <textarea id="field-exclude-regex" rows="2" placeholder="e.g. facebook\.com/messages"></textarea>
+          </div>
+
+          <fieldset class="form-group">
+            <legend>Actions</legend>
+            <label class="checkbox-label">
+              <input type="checkbox" id="action-history" checked>
+              Delete history
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" id="action-cookies">
+              Delete cookies
+              <span class="warning-hint">Will log you out</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" id="action-cache">
+              Delete cache
+              <span class="warning-hint">Global — affects all sites</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" id="action-sitedata">
+              Delete site data
+              <span class="warning-hint">localStorage, IndexedDB, service workers</span>
+            </label>
+          </fieldset>
+
+          <fieldset class="form-group">
+            <legend>Timing</legend>
+            <label class="checkbox-label">
+              <input type="checkbox" id="timing-asap" checked>
+              ASAP (on visit)
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" id="timing-tab-close">
+              On tab close
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" id="timing-browser-close">
+              On browser close (best-effort)
+            </label>
+            <div class="inline-field">
+              <label for="timing-periodic">Periodic sweep every</label>
+              <input type="number" id="timing-periodic" min="1" max="1440" placeholder="off">
+              <span>minutes</span>
+            </div>
+          </fieldset>
+
+          <fieldset class="form-group">
+            <legend>Safety</legend>
+            <div class="inline-field">
+              <label for="safety-rate">Max deletes per minute</label>
+              <input type="number" id="safety-rate" min="1" max="1000" value="60">
+            </div>
+            <div class="inline-field">
+              <label for="safety-cooldown">Origin cooldown (seconds)</label>
+              <input type="number" id="safety-cooldown" min="0" max="3600" value="0">
+            </div>
+          </fieldset>
+        </div>
+
+        <!-- URL Test Tool (always visible) -->
+        <div class="tool-section">
+          <h2>URL Test Tool</h2>
+          <p class="hint">Paste a URL to see which rules would match and what actions would be taken.</p>
+          <div class="test-input-row">
+            <input type="text" id="test-url" placeholder="https://example.com/page">
+            <button id="btn-test" class="btn btn-small btn-accent">Test</button>
+          </div>
+          <div id="test-results" class="test-results hidden"></div>
+        </div>
+
+        <!-- Placeholder when no editor open -->
+        <div id="editor-placeholder" class="placeholder">
+          <p>Select a rule to edit, or create a new one.</p>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script src="../shared/constants.js"></script>
+  <script src="../shared/rule-schema.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

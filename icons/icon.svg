@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2d1b69"/>
+      <stop offset="100%" style="stop-color:#1a1a2e"/>
+    </linearGradient>
+  </defs>
+  <!-- Background circle -->
+  <circle cx="64" cy="64" r="60" fill="url(#bg)" stroke="#6c5ce7" stroke-width="3"/>
+  <!-- Ghost/shadow figure -->
+  <path d="M44 42 C44 30, 84 30, 84 42 L84 78 C84 82, 78 78, 74 82 C70 86, 66 78, 62 82 C58 86, 54 78, 50 82 C46 86, 44 82, 44 78 Z"
+        fill="#a29bfe" opacity="0.85"/>
+  <!-- Eyes -->
+  <ellipse cx="54" cy="52" rx="5" ry="6" fill="#1a1a2e"/>
+  <ellipse cx="74" cy="52" rx="5" ry="6" fill="#1a1a2e"/>
+  <!-- Eye shine -->
+  <circle cx="56" cy="50" r="2" fill="#dfe6e9" opacity="0.8"/>
+  <circle cx="76" cy="50" r="2" fill="#dfe6e9" opacity="0.8"/>
+  <!-- Strikethrough line (represents deletion/hiding) -->
+  <line x1="28" y1="92" x2="100" y2="92" stroke="#fd79a8" stroke-width="4" stroke-linecap="round" opacity="0.9"/>
+</svg>

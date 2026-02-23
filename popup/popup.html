@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup">
+    <header class="header">
+      <img src="../icons/icon-32.png" alt="" class="logo">
+      <h1>ShadowLog</h1>
+      <span class="version">v0.1.0</span>
+    </header>
+
+    <div class="status-bar">
+      <span class="status-item">
+        <span class="label">Rules:</span>
+        <span id="rule-count">-</span>
+      </span>
+      <span class="status-item">
+        <span class="label">Buffer:</span>
+        <span id="buffer-count">-</span>
+      </span>
+    </div>
+
+    <div class="actions">
+      <button id="btn-pause" class="btn btn-primary btn-full">
+        <span id="pause-icon">&#9208;</span>
+        <span id="pause-text">Pause</span>
+      </button>
+      <button id="btn-forget" class="btn btn-danger btn-full">
+        Forget Current Tab
+      </button>
+    </div>
+
+    <div id="forget-feedback" class="feedback hidden"></div>
+
+    <section class="log-section">
+      <h2>Recent Actions</h2>
+      <div id="action-log" class="action-log">
+        <p class="empty-state">No recent actions</p>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <a id="link-options" href="#">Options</a>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

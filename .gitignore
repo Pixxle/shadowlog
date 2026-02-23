@@ -1,0 +1,22 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Build artifacts
+*.zip
+*.xpi
+web-ext-artifacts/
+
+# Node (if added later)
+node_modules/
+
+# Temporary
+*.tmp
+*.log

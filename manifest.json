@@ -1,0 +1,55 @@
+{
+  "manifest_version": 3,
+  "name": "ShadowLog",
+  "version": "0.1.0",
+  "description": "Regex-based automatic browsing history and site data cleanup — private browsing lite",
+
+  "background": {
+    "scripts": [
+      "shared/constants.js",
+      "shared/rule-schema.js",
+      "shared/storage-helpers.js",
+      "background/rules-engine.js",
+      "background/deletion-engine.js",
+      "background/buffer.js",
+      "background/tab-tracker.js",
+      "background/scheduler.js",
+      "background/main.js"
+    ]
+  },
+
+  "permissions": [
+    "history",
+    "browsingData",
+    "webNavigation",
+    "tabs",
+    "storage",
+    "alarms"
+  ],
+
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png"
+    }
+  },
+
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
+
+  "icons": {
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "shadowlog@shadowlog.ext",
+      "strict_min_version": "115.0"
+    }
+  }
+}
