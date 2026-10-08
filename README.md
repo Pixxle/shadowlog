@@ -8,9 +8,7 @@ Firefox extension for selective browsing history cleanup. Define regex rules to 
 
 ## Install
 
-1. Open `about:debugging#/runtime/this-firefox` in Firefox (115+)
-2. Click **Load Temporary Add-on**
-3. Select `manifest.json` from this directory
+Can be installed via the [Firefox extension page](https://addons.mozilla.org/en-US/firefox/addon/shadowlog/)
 
 ## How It Works
 
